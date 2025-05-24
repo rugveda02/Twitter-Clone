@@ -1,13 +1,14 @@
-// =============================
-// Service: LikeService.java
-// =============================
 package org.example.services;
 
-import org.example.entity.*;
-import org.example.repository.*;
+import org.example.entity.Like;
+import org.example.entity.Tweet;
+import org.example.entity.User;
+import org.example.repository.LikeRepository;
+import org.example.repository.TweetRepository;
+import org.example.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import javax.persistence.EntityNotFoundException;
+
 import java.util.List;
 
 @Service
@@ -22,22 +23,26 @@ public class LikeService {
     @Autowired
     private UserRepository userRepository;
 
-    @Autowired
-    private FollowerRepository followerRepository;
+    public List<Like> getAllLikes() {
+        return likeRepository.findAll();
+    }
+
+    public List<Like> getLikesByTweetId(Long tweetId) {
+        Tweet tweet = tweetRepository.findById(tweetId).orElse(null);
+        return tweet != null ? likeRepository.findByTweet(tweet) : null;
+    }
+
+    public long getLikeCountByTweetId(Long tweetId) {
+        Tweet tweet = tweetRepository.findById(tweetId).orElse(null);
+        return tweet != null ? likeRepository.countByTweet(tweet) : 0;
+    }
 
     public Like createLike(Long userId, Long tweetId) {
-        User user = userRepository.findById(userId).orElseThrow(() -> new EntityNotFoundException("User not found"));
-        Tweet tweet = tweetRepository.findById(tweetId).orElseThrow(() -> new EntityNotFoundException("Tweet not found"));
+        User user = userRepository.findById(userId).orElse(null);
+        Tweet tweet = tweetRepository.findById(tweetId).orElse(null);
 
-        if (tweet.getUser().isPrivate()) {
-            boolean isFollower = followerRepository.existsByFollowerIdAndFollowedId(userId, tweet.getUser().getId());
-            if (!isFollower) {
-                throw new SecurityException("Cannot like a private tweet without being a follower.");
-            }
-        }
-
-        if (likeRepository.findByUserAndTweet(user, tweet).isPresent()) {
-            throw new IllegalStateException("You already liked this tweet.");
+        if (user == null || tweet == null || likeRepository.existsByUserAndTweet(user, tweet)) {
+            return null;
         }
 
         Like like = new Like();
@@ -46,17 +51,7 @@ public class LikeService {
         return likeRepository.save(like);
     }
 
-    public List<Like> getLikesByTweetId(Long tweetId) {
-        Tweet tweet = tweetRepository.findById(tweetId).orElseThrow(() -> new EntityNotFoundException("Tweet not found"));
-        return likeRepository.findByTweet(tweet);
-    }
-
-    public void deleteLike(Long likeId, Long userId) {
-        Like like = likeRepository.findById(likeId).orElseThrow(() -> new EntityNotFoundException("Like not found"));
-        if (!like.getUser().getId().equals(userId)) {
-            throw new SecurityException("You can only delete your own likes.");
-        }
-        likeRepository.delete(like);
+    public void deleteLike(Long id) {
+        likeRepository.deleteById(id);
     }
 }
-
